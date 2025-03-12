@@ -8,9 +8,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/yourname/ioeye/pkg/ebpf"
-	"github.com/yourname/ioeye/pkg/k8s"
-	"github.com/yourname/ioeye/pkg/monitor"
+	"github.com/lizhongxuan/ioeye/pkg/ebpf"
+	"github.com/lizhongxuan/ioeye/pkg/k8s"
+	"github.com/lizhongxuan/ioeye/pkg/monitor"
 )
 
 func main() {

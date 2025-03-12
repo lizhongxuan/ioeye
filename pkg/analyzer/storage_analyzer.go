@@ -6,35 +6,35 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yourname/ioeye/pkg/monitor"
+	"github.com/lizhongxuan/ioeye/pkg/monitor"
 )
 
 // LatencyThreshold 定义I/O延迟阈值（纳秒）
 const (
-	ReadLatencyThreshold  = 10 * 1000 * 1000  // 10ms
-	WriteLatencyThreshold = 20 * 1000 * 1000  // 20ms
-	QueueLatencyThreshold = 5 * 1000 * 1000   // 5ms
+	ReadLatencyThreshold  = 10 * 1000 * 1000 // 10ms
+	WriteLatencyThreshold = 20 * 1000 * 1000 // 20ms
+	QueueLatencyThreshold = 5 * 1000 * 1000  // 5ms
 )
 
 // BottleneckType 表示瓶颈类型
 type BottleneckType string
 
 const (
-	BottleneckTypeNone         BottleneckType = "none"
-	BottleneckTypeQueue        BottleneckType = "queue"
-	BottleneckTypeDisk         BottleneckType = "disk"
-	BottleneckTypeNetwork      BottleneckType = "network"
-	BottleneckTypeUnknown      BottleneckType = "unknown"
+	BottleneckTypeNone    BottleneckType = "none"
+	BottleneckTypeQueue   BottleneckType = "queue"
+	BottleneckTypeDisk    BottleneckType = "disk"
+	BottleneckTypeNetwork BottleneckType = "network"
+	BottleneckTypeUnknown BottleneckType = "unknown"
 )
 
 // StorageAnalyzer 存储性能分析器
 type StorageAnalyzer struct {
-	mu                  sync.RWMutex
-	metricsHistory      map[string][]*monitor.PodStorageMetrics
-	maxHistoryPerPod    int
-	podBottlenecks      map[string]BottleneckType
-	anomalyDetected     map[string]bool
-	anomalyThreshold    float64 // 异常检测阈值
+	mu               sync.RWMutex
+	metricsHistory   map[string][]*monitor.PodStorageMetrics
+	maxHistoryPerPod int
+	podBottlenecks   map[string]BottleneckType
+	anomalyDetected  map[string]bool
+	anomalyThreshold float64 // 异常检测阈值
 }
 
 // NewStorageAnalyzer 创建新的存储性能分析器
@@ -291,4 +291,4 @@ func (sa *StorageAnalyzer) detectAnomaly(podName string) bool {
 	}
 
 	return false
-} 
+}

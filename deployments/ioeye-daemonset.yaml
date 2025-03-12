@@ -17,7 +17,7 @@ spec:
       hostPID: true
       containers:
       - name: ioeye-agent
-        image: yourname/ioeye:latest
+        image: lizhongxuan/ioeye:latest
         imagePullPolicy: Always
         securityContext:
           privileged: true

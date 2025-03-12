@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -52,45 +53,45 @@ func NewClient(kubeconfigPath string) (*Client, error) {
 // ListPods 列出特定命名空间中的所有Pod
 func (c *Client) ListPods(namespace string) ([]string, error) {
 	var podNames []string
-	
+
 	// 如果namespace为空，则列出所有命名空间的Pod
 	ns := namespace
 	if ns == "" {
 		ns = metav1.NamespaceAll
 	}
-	
-	pods, err := c.clientset.CoreV1().Pods(ns).List(metav1.ListOptions{})
+
+	pods, err := c.clientset.CoreV1().Pods(ns).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list pods: %v", err)
 	}
-	
+
 	for _, pod := range pods.Items {
 		podNames = append(podNames, pod.Name)
 	}
-	
+
 	return podNames, nil
 }
 
 // GetPodVolumes 获取特定Pod的卷信息
 func (c *Client) GetPodVolumes(namespace, podName string) ([]string, error) {
 	var volumeNames []string
-	
-	pod, err := c.clientset.CoreV1().Pods(namespace).Get(podName, metav1.GetOptions{})
+
+	pod, err := c.clientset.CoreV1().Pods(namespace).Get(context.Background(), podName, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get pod %s: %v", podName, err)
 	}
-	
+
 	for _, volume := range pod.Spec.Volumes {
 		volumeNames = append(volumeNames, volume.Name)
 	}
-	
+
 	return volumeNames, nil
 }
 
 // GetCSIDrivers 返回集群中所有的CSI驱动
 func (c *Client) GetCSIDrivers() ([]string, error) {
 	var driverNames []string
-	
+
 	// 需要使用CSI API获取驱动列表
 	// 此处为简化示例，仅返回常见的一些CSI驱动名称
 	driverNames = []string{
@@ -99,6 +100,6 @@ func (c *Client) GetCSIDrivers() ([]string, error) {
 		"disk.csi.azure.com",
 		"cinder.csi.openstack.org",
 	}
-	
+
 	return driverNames, nil
-} 
+}

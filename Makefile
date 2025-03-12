@@ -2,7 +2,7 @@
 
 # 变量
 BINARY_NAME=ioeye-agent
-DOCKER_REPO=yourname/ioeye
+DOCKER_REPO=lizhongxuan/ioeye
 DOCKER_TAG=latest
 
 # 默认目标
