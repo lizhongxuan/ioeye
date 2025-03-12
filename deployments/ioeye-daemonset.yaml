@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: ioeye-agent
+  namespace: kube-system
+  labels:
+    app: ioeye-agent
+spec:
+  selector:
+    matchLabels:
+      app: ioeye-agent
+  template:
+    metadata:
+      labels:
+        app: ioeye-agent
+    spec:
+      hostPID: true
+      containers:
+      - name: ioeye-agent
+        image: yourname/ioeye:latest
+        imagePullPolicy: Always
+        securityContext:
+          privileged: true
+          capabilities:
+            add:
+            - SYS_ADMIN
+            - SYS_RESOURCE
+            - SYS_PTRACE
+        volumeMounts:
+        - name: sys
+          mountPath: /sys
+          readOnly: true
+        - name: debugfs
+          mountPath: /sys/kernel/debug
+        - name: modules
+          mountPath: /lib/modules
+          readOnly: true
+        - name: bpffs
+          mountPath: /sys/fs/bpf
+        resources:
+          limits:
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        effect: NoSchedule
+      volumes:
+      - name: sys
+        hostPath:
+          path: /sys
+      - name: debugfs
+        hostPath:
+          path: /sys/kernel/debug
+      - name: modules
+        hostPath:
+          path: /lib/modules
+      - name: bpffs
+        hostPath:
+          path: /sys/fs/bpf
+          type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ioeye-service
+  namespace: kube-system
+  labels:
+    app: ioeye-agent
+spec:
+  selector:
+    app: ioeye-agent
+  ports:
+  - name: api
+    port: 8080
+    targetPort: 8080
+  type: ClusterIP
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ioeye-agent
+rules:
+- apiGroups: [""]
+  resources: ["pods", "persistentvolumes", "persistentvolumeclaims"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["storage.k8s.io"]
+  resources: ["csidrivers"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ioeye-agent
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: ioeye-agent
+  apiGroup: rbac.authorization.k8s.io 
