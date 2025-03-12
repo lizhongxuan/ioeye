@@ -1,4 +1,4 @@
-# IOEye: eBPF驱动的云原生存储性能优化器
+# IOEye
 
 IOEye是一个基于eBPF和Golang的云原生存储性能监控与优化系统，专注于解决容器化环境中存储性能抖动问题，提升应用响应速度。
 
@@ -16,21 +16,7 @@ IOEye是一个基于eBPF和Golang的云原生存储性能监控与优化系统�
 - **Kubernetes集成**：通过CRD和Operator模式实现与K8s的无缝集成
 - **可视化与API接口**：提供RESTful API和Web界面
 
-## 项目结构
 
-```
-ioeye/
-├── bpf/        # eBPF程序源码
-├── build/      # 编译脚本和构建产物
-├── cmd/        # 命令行入口
-├── deployments/# Kubernetes部署清单
-├── docs/       # 文档
-└── pkg/        # Go包
-    ├── ebpf/   # eBPF Go封装
-    ├── k8s/    # Kubernetes交互
-    ├── monitor/# 监控系统
-    └── analyzer/# 性能分析
-```
 
 ## 开发环境要求
 
@@ -38,7 +24,3 @@ ioeye/
 - LLVM/Clang 11+
 - Linux内核 5.10+
 - Kubernetes 1.22+
-
-## 许可证
-
-MIT 
