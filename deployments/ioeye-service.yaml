@@ -1,0 +1,58 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ioeye-api
+  namespace: kube-system
+  labels:
+    app: ioeye-agent
+    component: api
+spec:
+  selector:
+    app: ioeye-agent
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ioeye-api
+  namespace: kube-system
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /ioeye
+        pathType: Prefix
+        backend:
+          service:
+            name: ioeye-api
+            port:
+              number: 8080
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ioeye-metrics
+  namespace: kube-system
+  labels:
+    app: ioeye-agent
+spec:
+  selector:
+    matchLabels:
+      app: ioeye-agent
+      component: api
+  endpoints:
+  - port: http
+    path: /api/v1/metrics
+    interval: 15s
+  namespaceSelector:
+    matchNames:
+      - kube-system 
