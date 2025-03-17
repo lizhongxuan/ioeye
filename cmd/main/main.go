@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -14,6 +13,8 @@ import (
 	"github.com/lizhongxuan/ioeye/pkg/ebpf"
 	"github.com/lizhongxuan/ioeye/pkg/k8s"
 	"github.com/lizhongxuan/ioeye/pkg/monitor"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 func main() {
@@ -24,35 +25,59 @@ func main() {
 	apiAddr := flag.String("api-addr", ":8080", "Address to bind API server")
 	flag.Parse()
 
-	log.Println("Starting IOEye - eBPF driven storage performance optimizer")
+	// 初始化zap日志，配置输出格式和代码行号
+	// 创建自定义编码器配置
+	encoderConfig := zap.NewProductionEncoderConfig()
+	encoderConfig.TimeKey = "time"
+	encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	encoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
+
+	// 创建Core
+	core := zapcore.NewCore(
+		zapcore.NewConsoleEncoder(encoderConfig),
+		zapcore.AddSync(os.Stdout),
+		zapcore.InfoLevel,
+	)
+
+	// 创建Logger，启用调用者信息（文件名和行号）
+	logger := zap.New(core, zap.AddCaller(), zap.AddCallerSkip(0))
+	defer logger.Sync() // 刷新缓冲区
+	
+	// 替换全局logger
+	zap.ReplaceGlobals(logger)
+
+	zap.L().Info("Starting IOEye - eBPF driven storage performance optimizer")
 
 	// 创建上下文，支持优雅退出
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// 初始化Kubernetes客户端
-	log.Println("Initializing Kubernetes client...")
+	zap.L().Info("Initializing Kubernetes client...")
 	k8sClient, err := k8s.NewClient(*kubeconfig)
 	if err != nil {
-		log.Fatalf("Failed to create Kubernetes client: %v", err)
+		zap.L().Error("Failed to create Kubernetes client", zap.Error(err))
+		os.Exit(1)
 	}
 
 	// 初始化eBPF子系统
-	log.Println("Initializing eBPF monitor...")
+	zap.L().Info("Initializing eBPF monitor...")
 	bpfMonitor, err := ebpf.NewMonitor()
 	if err != nil {
-		log.Fatalf("Failed to initialize eBPF monitor: %v", err)
+		zap.L().Error("Failed to initialize eBPF monitor", zap.Error(err))
+		os.Exit(1)
 	}
 	defer bpfMonitor.Close()
 
 	// 启动eBPF监控
-	log.Println("Starting eBPF monitor...")
+	zap.L().Info("Starting eBPF monitor...")
 	if err := bpfMonitor.Start(); err != nil {
-		log.Fatalf("Failed to start eBPF monitor: %v", err)
+		zap.L().Error("Failed to start eBPF monitor", zap.Error(err))
+		os.Exit(1)
 	}
 
 	// 初始化存储性能监控系统
-	log.Println("Initializing storage monitor...")
+	zap.L().Info("Initializing storage monitor...")
 	storageMonitor := monitor.NewStorageMonitor(
 		bpfMonitor,
 		k8sClient,
@@ -61,25 +86,27 @@ func main() {
 	)
 
 	// 初始化存储性能分析器
-	log.Println("Initializing storage analyzer...")
+	zap.L().Info("Initializing storage analyzer...")
 	storageAnalyzer := analyzer.NewStorageAnalyzer(
 		analyzer.WithMaxHistoryPerPod(100),    // 保存100个历史数据点
 		analyzer.WithAnomalyThreshold(2.0),    // 标准差阈值
 	)
 
 	// 启动API服务器
-	log.Printf("Starting API server on %s...", *apiAddr)
+	zap.L().Info("Starting API server", zap.String("address", *apiAddr))
 	apiServer := api.NewAPIServer(storageMonitor, storageAnalyzer, *apiAddr)
 	go func() {
 		if err := apiServer.Start(ctx); err != nil {
-			log.Fatalf("Failed to start API server: %v", err)
+			zap.L().Error("Failed to start API server", zap.Error(err))
+			os.Exit(1)
 		}
 	}()
 
 	// 启动存储监控
-	log.Println("Starting storage monitor...")
+	zap.L().Info("Starting storage monitor...")
 	if err := storageMonitor.Start(ctx); err != nil {
-		log.Fatalf("Failed to start storage monitor: %v", err)
+		zap.L().Error("Failed to start storage monitor", zap.Error(err))
+		os.Exit(1)
 	}
 
 	// 启动数据分析goroutine
@@ -99,8 +126,10 @@ func main() {
 				// 获取分析结果示例
 				topSlowPods := storageAnalyzer.GetTopNSlowPods(5)
 				if len(topSlowPods) > 0 {
-					log.Printf("Top slow pod: %s (read latency: %d ns, write latency: %d ns)",
-						topSlowPods[0].PodName, topSlowPods[0].ReadLatency, topSlowPods[0].WriteLatency)
+					zap.L().Info("Top slow pod detected",
+						zap.String("pod", topSlowPods[0].PodName),
+						zap.Uint64("read_latency_ns", topSlowPods[0].ReadLatency),
+						zap.Uint64("write_latency_ns", topSlowPods[0].WriteLatency))
 				}
 				
 			case <-ctx.Done():
@@ -110,18 +139,18 @@ func main() {
 	}()
 
 	// 打印可用的API端点
-	log.Println("Available API endpoints:")
-	log.Println("  - GET /api/v1/metrics            - Get all pod metrics")
-	log.Println("  - GET /api/v1/metrics/pod/{name} - Get specific pod metrics")
-	log.Println("  - GET /api/v1/metrics/topslow    - Get top slow pods")
-	log.Println("  - GET /api/v1/health             - Health check")
+	zap.L().Info("Available API endpoints")
+	zap.L().Info("- GET /api/v1/metrics            - Get all pod metrics")
+	zap.L().Info("- GET /api/v1/metrics/pod/{name} - Get specific pod metrics")
+	zap.L().Info("- GET /api/v1/metrics/topslow    - Get top slow pods")
+	zap.L().Info("- GET /api/v1/health             - Health check")
 
 	// 等待信号退出
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	<-sigCh
 
-	log.Println("Shutting down IOEye...")
+	zap.L().Info("Shutting down IOEye...")
 	
 	// 优雅关闭
 	apiServer.Stop()
