@@ -1,0 +1,204 @@
+@startuml IOEye系统架构
+!theme plain
+
+' 基本组件
+component "eBPF程序" as eBPF #lightblue
+
+component "IOEye Agent" as Agent #lightgreen {
+  component "eBPF监控器" as Monitor #white
+  component "存储性能分析器" as Analyzer #white
+  component "API服务器" as API #white
+  component "K8s客户端" as K8sClient #white
+}
+component "Kubernetes" as K8s #lightyellow {
+  component "Pod" as Pod #white
+  component "CSI接口" as CSI #white
+  component "存储系统" as Storage #white
+}
+component "用户界面" as UI #lightpink
+
+' 数据流
+eBPF -down-> Agent : 收集I/O性能数据
+Agent -right-> K8s : 监控&优化
+K8s -left-> Agent : 返回Pod信息
+Agent -up-> UI : 提供API服务
+UI -down-> Agent : 请求数据/操作
+
+' 详细流程
+note right of eBPF
+  通过BPF程序跟踪内核中
+  存储I/O路径的关键函数
+end note
+
+note right of Monitor
+  收集和处理eBPF数据
+  与Kubernetes集成
+  监控Pod存储性能
+end note
+
+note right of Analyzer
+  分析I/O性能指标
+  识别性能瓶颈
+  检测异常行为
+end note
+
+note right of API
+  提供RESTful API
+  - /api/v1/metrics
+  - /api/v1/metrics/topslow
+  - /api/v1/health
+end note
+
+' 流程图
+title IOEye - eBPF driven storage performance optimizer
+
+legend right
+  数据流程:
+  1. eBPF程序在内核中收集I/O性能数据
+  2. 监控器聚合数据并关联K8s元数据
+  3. 分析器处理性能数据并识别异常
+  4. API服务器提供数据访问接口
+  5. 用户通过界面查看指标并进行操作
+end legend
+
+@enduml
+
+@startuml IOEye数据流程
+!theme plain
+
+' 定义参与者
+participant "内核" as Kernel
+participant "eBPF程序" as eBPF
+participant "eBPF监控器" as Monitor
+participant "K8s客户端" as K8s
+participant "存储分析器" as Analyzer
+participant "API服务器" as API
+participant "用户界面" as UI
+
+' 流程图
+title IOEye数据流程图
+
+autonumber
+Kernel -> eBPF: I/O操作触发eBPF探针
+note right: block_rq_issue, block_rq_complete等
+
+eBPF -> eBPF: 收集I/O数据（延迟、IOPS等）
+eBPF -> Monitor: 通过共享内存映射传输数据
+Monitor -> K8s: 获取Pod和存储卷元数据
+K8s -> Monitor: 返回Pod和存储卷信息
+Monitor -> Monitor: 关联I/O数据与Pod信息
+Monitor -> Analyzer: 定期传输聚合后的性能数据
+Analyzer -> Analyzer: 分析性能指标、识别异常
+Analyzer -> Analyzer: 计算I/O路径延迟分解
+Analyzer -> API: 提供分析结果
+API -> UI: 通过RESTful API提供数据
+UI -> UI: 渲染性能指标和告警
+UI -> API: 用户请求特定Pod的指标
+API -> Monitor: 获取实时指标
+Monitor -> API: 返回实时指标
+API -> UI: 返回数据
+
+note over eBPF, Monitor
+  数据收集周期：每10秒
+  (可通过参数配置)
+end note
+
+note over Analyzer
+  分析指标:
+  - IOPS (读/写)
+  - 吞吐量 (读/写)
+  - 延迟 (读/写)
+  - 队列深度
+  - I/O大小分布
+end note
+
+@enduml
+
+@startuml IOEye部署拓扑
+!theme plain
+skinparam linetype ortho
+
+' 定义Kubernetes集群
+rectangle "Kubernetes集群" as K8s {
+  rectangle "节点1\n(Master)" as Node1 {
+    rectangle "kube-apiserver" as API1 #aliceblue
+    rectangle "kube-controller-manager" as CM #aliceblue
+    rectangle "kube-scheduler" as SCH #aliceblue
+    rectangle "IOEye Agent (DaemonSet)" as Agent1 #palegreen
+  }
+  
+  rectangle "节点2\n(Worker)" as Node2 {
+    rectangle "kubelet" as KUB2 #aliceblue
+    rectangle "IOEye Agent (DaemonSet)" as Agent2 #palegreen
+    rectangle "业务Pod A" as PodA #lightyellow
+    rectangle "业务Pod B" as PodB #lightyellow
+  }
+  
+  rectangle "节点3\n(Worker)" as Node3 {
+    rectangle "kubelet" as KUB3 #aliceblue
+    rectangle "IOEye Agent (DaemonSet)" as Agent3 #palegreen
+    rectangle "业务Pod C" as PodC #lightyellow
+    rectangle "业务Pod D" as PodD #lightyellow
+  }
+  
+  rectangle "存储节点" as Storage {
+    rectangle "CSI驱动" as CSI #aliceblue
+    database "存储卷" as PV #lightblue
+  }
+  
+  rectangle "IOEye Dashboard" as Dashboard #pink
+}
+
+' 定义连接关系
+API1 -- Agent1
+API1 -- Agent2
+API1 -- Agent3
+
+Agent1 -- Node1 : 监控主机I/O
+Agent2 -- Node2 : 监控主机I/O
+Agent3 -- Node3 : 监控主机I/O
+
+Agent2 -- PodA : 监控Pod I/O
+Agent2 -- PodB : 监控Pod I/O
+Agent3 -- PodC : 监控Pod I/O
+Agent3 -- PodD : 监控Pod I/O
+
+PodA -- CSI : 存储I/O
+PodB -- CSI : 存储I/O
+PodC -- CSI : 存储I/O
+PodD -- CSI : 存储I/O
+
+CSI -- PV : 物理I/O
+
+Dashboard -- API1 : 查询指标数据
+Agent1 .. Agent2 : 数据聚合
+Agent2 .. Agent3 : 数据聚合
+
+' 注释
+note right of Dashboard
+  提供统一的可视化界面:
+  - 集群存储性能概览
+  - Pod级存储性能指标
+  - 异常检测与告警
+  - I/O路径延迟分析
+end note
+
+note bottom of Storage
+  IOEye可以监控各种存储类型:
+  - 本地存储
+  - NFS
+  - Ceph
+  - 云存储服务
+end note
+
+title IOEye在Kubernetes集群中的部署拓扑
+
+legend right
+  部署说明:
+  1. IOEye Agent通过DaemonSet部署到每个节点
+  2. 每个Agent收集本节点的所有Pod I/O指标
+  3. 通过API聚合来自所有节点的数据
+  4. Dashboard提供统一的可视化和管理界面
+end legend
+
+@enduml
